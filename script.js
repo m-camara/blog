@@ -1,6 +1,7 @@
 // ========================================
 // CONFIGURATION FIREBASE
 // ========================================
+
 // IMPORTANT : Remplacez par votre propre configuration !
 const firebaseConfig = {
     apiKey: "AIzaSyD-rOIEpoV68RJ-Z2Sd2qwCWSBlUZtLzxs",
@@ -77,6 +78,10 @@ auth.onAuthStateChanged(async (user) => {
         isAdmin = false;
     }
 
+    async function loadArticles(params) {
+        
+    }
+
     // Recharger les articles
     loadArticles();
 });
@@ -84,6 +89,39 @@ auth.onAuthStateChanged(async (user) => {
 // ========================================
 // EVENT LISTENERS
 // ========================================
+
+function showMessage(id){
+    const showMessage = document.getElementById('showMessage')
+    if(showMessage){
+
+    }
+}
+
+function openModal(id){
+    const modal = document.getElementById(id);
+    if(modal){
+          modal.classList.add('active');
+
+    }
+}
+
+function closeModal(id){
+    const modal = document.getElementById(id);
+        if(modal){
+            modal.classList.remove("active");
+        }
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+    const registerBtn = document.getElementById("registerBtn");
+    if(registerBtn){
+        registerBtn.addEventListener("click",() => openModal("registerModal"));
+
+    }else{
+        console.log('bouton introuvable')
+    }
+})
+
 document.addEventListener('DOMContentLoaded', () => {
     // Boutons d'authentification
     document.getElementById('loginBtn').addEventListener('click',
@@ -233,17 +271,13 @@ async function handleRegister(e) {
     }
 }
 
-async function handleArticleSubmit() {
-    e.preventDefault();
-    const titre = document.getElementById('articleTitle').value;
-    const contenu = document.getElementById('articleContent').value;
 
-    if (isAdmin) {
-        
-        
-    }
-
+async function handleArticleSubmit(e){
+    const titre = document.getElementById("articleTitle").value;
+     const content = document.getElementById("articleContent").value;
+      const published = document.getElementById("articlePublished").checked;
 }
+
 
 
 
