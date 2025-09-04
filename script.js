@@ -1,7 +1,6 @@
 // ========================================
 // CONFIGURATION FIREBASE
 // ========================================
-import { initializeApp } from "firebase/app";
 // IMPORTANT : Remplacez par votre propre configuration !
 const firebaseConfig = {
     apiKey: "AIzaSyD-rOIEpoV68RJ-Z2Sd2qwCWSBlUZtLzxs",
@@ -13,7 +12,7 @@ const firebaseConfig = {
 };
 
 // Initialisation de Firebase
-const app = initializeApp(firebaseConfig);
+const app = firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -32,18 +31,18 @@ let isLoadingArticles = false;   // Flag de chargement
 // ========================================
 auth.onAuthStateChanged(async (user) => {
     currentUser = user;
-    
+
     if (user) {
         console.log('✅ Utilisateur connecté:', user.email);
-        
+
         // Récupérer les informations utilisateur
         try {
             const userDoc = await db.collection('users').doc(user.uid).get();
-            
+
             if (userDoc.exists) {
                 const userData = userDoc.data();
                 isAdmin = userData.role === 'admin';
-                document.getElementById('userInfo').textContent = 
+                document.getElementById('userInfo').textContent =
                     `Bonjour, ${userData.displayName || user.email}`;
             } else {
                 // Créer le profil si inexistant
@@ -62,13 +61,13 @@ auth.onAuthStateChanged(async (user) => {
         document.getElementById('loginBtn').style.display = 'none';
         document.getElementById('registerBtn').style.display = 'none';
         document.getElementById('logoutBtn').style.display = 'block';
-        
+
         if (isAdmin) {
             document.getElementById('adminPanel').style.display = 'block';
         }
     } else {
         console.log('👤 Utilisateur déconnecté');
-        
+
         // Réinitialisation
         document.getElementById('userInfo').textContent = '';
         document.getElementById('loginBtn').style.display = 'block';
@@ -77,7 +76,7 @@ auth.onAuthStateChanged(async (user) => {
         document.getElementById('adminPanel').style.display = 'none';
         isAdmin = false;
     }
-    
+
     // Recharger les articles
     loadArticles();
 });
@@ -87,14 +86,14 @@ auth.onAuthStateChanged(async (user) => {
 // ========================================
 document.addEventListener('DOMContentLoaded', () => {
     // Boutons d'authentification
-    document.getElementById('loginBtn').addEventListener('click', 
+    document.getElementById('loginBtn').addEventListener('click',
         () => openModal('loginModal'));
-    
-    document.getElementById('registerBtn').addEventListener('click', 
+
+    document.getElementById('registerBtn').addEventListener('click',
         () => openModal('registerModal'));
-    
+
     document.getElementById('logoutBtn').addEventListener('click', logout);
-    
+
     // Bouton nouvel article (admin)
     const newArticleBtn = document.getElementById('newArticleBtn');
     if (newArticleBtn) {
@@ -105,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             openModal('articleModal');
         });
     }
-    
+
     // Formulaires
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('registerForm').addEventListener('submit', handleRegister);
@@ -118,14 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // ========================================
 document.addEventListener('DOMContentLoaded', () => {
     // Boutons d'authentification
-    document.getElementById('loginBtn').addEventListener('click', 
+    document.getElementById('loginBtn').addEventListener('click',
         () => openModal('loginModal'));
-    
-    document.getElementById('registerBtn').addEventListener('click', 
+
+    document.getElementById('registerBtn').addEventListener('click',
         () => openModal('registerModal'));
-    
+
     document.getElementById('logoutBtn').addEventListener('click', logout);
-    
+
     // Bouton nouvel article (admin)
     const newArticleBtn = document.getElementById('newArticleBtn');
     if (newArticleBtn) {
@@ -136,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             openModal('articleModal');
         });
     }
-    
+
     // Formulaires
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('registerForm').addEventListener('submit', handleRegister);
@@ -148,10 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // ========================================
 async function handleLogin(e) {
     e.preventDefault();
-    
+
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
-    
+
     try {
         console.log('🔐 Tentative de connexion...');
         await auth.signInWithEmailAndPassword(email, password);
@@ -160,10 +159,10 @@ async function handleLogin(e) {
         document.getElementById('loginForm').reset();
     } catch (error) {
         console.error('Erreur de connexion:', error);
-        
+
         // Messages d'erreur personnalisés
         let message = 'Erreur de connexion';
-        switch(error.code) {
+        switch (error.code) {
             case 'auth/user-not-found':
                 message = 'Aucun compte trouvé avec cet email';
                 break;
@@ -186,23 +185,23 @@ async function handleLogin(e) {
 // ========================================
 async function handleRegister(e) {
     e.preventDefault();
-    
+
     const name = document.getElementById('registerName').value;
     const email = document.getElementById('registerEmail').value;
     const password = document.getElementById('registerPassword').value;
-    
+
     try {
         console.log('📝 Création du compte...');
-        
+
         // Créer le compte
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
-        
+
         // Mettre à jour le profil
         await user.updateProfile({
             displayName: name
         });
-        
+
         // Créer le document utilisateur
         await db.collection('users').doc(user.uid).set({
             email: email,
@@ -210,16 +209,16 @@ async function handleRegister(e) {
             role: 'user', // Par défaut, tous les nouveaux utilisateurs sont 'user'
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
+
         closeModal('registerModal');
         showMessage('✅ Inscription réussie ! Bienvenue ' + name, 'success');
         document.getElementById('registerForm').reset();
-        
+
     } catch (error) {
         console.error('Erreur d\'inscription:', error);
-        
+
         let message = 'Erreur lors de l\'inscription';
-        switch(error.code) {
+        switch (error.code) {
             case 'auth/email-already-in-use':
                 message = 'Cet email est déjà utilisé';
                 break;
@@ -233,6 +232,21 @@ async function handleRegister(e) {
         showMessage(message, 'error');
     }
 }
+
+async function handleArticleSubmit() {
+    e.preventDefault();
+    const titre = document.getElementById('articleTitle').value;
+    const contenu = document.getElementById('articleContent').value;
+
+    if (isAdmin) {
+        
+        
+    }
+
+}
+
+
+
 
 // ========================================
 // DÉCONNEXION
@@ -248,75 +262,4 @@ function logout() {
                 showMessage('Erreur lors de la déconnexion', 'error');
             });
     }
-}
-
-async function searchArticles(searchTerm) {
-    const snapshot = await db.collection('articles')
-        .where('published', '==', true)
-        .get();
-    
-    const results = [];
-    snapshot.forEach(doc => {
-        const article = doc.data();
-        if (article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            article.content.toLowerCase().includes(searchTerm.toLowerCase())) {
-            results.push({ id: doc.id, data: article });
-        }
-    });
-    
-    displaySearchResults(results);
-}
-
-
-
-// JavaScript pour le toggle
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-}
-
-// Au chargement
-if (localStorage.getItem('darkMode') === 'true') {
-    document.body.classList.add('dark-mode');
-}
-
-
-let lastVisible = null;
-const articlesPerPage = 10;
-
-async function loadArticlesWithPagination(isNext = true) {
-    let query = db.collection('articles')
-        .where('published', '==', true)
-        .orderBy('createdAt', 'desc')
-        .limit(articlesPerPage);
-    
-    if (isNext && lastVisible) {
-        query = query.startAfter(lastVisible);
-    }
-    
-    const snapshot = await query.get();
-    
-    if (!snapshot.empty) {
-        lastVisible = snapshot.docs[snapshot.docs.length - 1];
-        // Afficher les articles...
-    }
-}
-
-async function uploadImage(file) {
-    const storageRef = firebase.storage().ref();
-    const imageRef = storageRef.child('images/' + Date.now() + '_' + file.name);
-    
-    const snapshot = await imageRef.put(file);
-    const downloadURL = await snapshot.ref.getDownloadURL();
-    
-    return downloadURL;
-}
-
-// Dans votre formulaire d'article
-document.getElementById('imageInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const imageUrl = await uploadImage(file);
-        // Insérer l'URL dans le contenu de l'article
-    }
-});
+};
