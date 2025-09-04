@@ -261,3 +261,13 @@ button {
         gap: 10px;
     }
 }
+
+body.dark-mode {
+    background: #1a1a1a;
+    color: white;
+};
+
+body.dark-mode .article-card {
+    background: #2a2a2a;
+    color: white;
+}
