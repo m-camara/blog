@@ -78,9 +78,89 @@ auth.onAuthStateChanged(async (user) => {
         isAdmin = false;
     }
 
-    async function loadArticles(params) {
-        
+   async function loadArticles() {
+    if(isLoadingArticles) return;{
+        isLoadingArticles = true;
+
     }
+    console.log('📰 Chargement des articles...');
+    const container = document.getElementById('articlesContainer'); // Bon ID
+    container.innerHTML = "";
+
+    if (!container) {
+        console.error('Container articles non trouvé');
+        return;
+    }
+    
+    // Afficher le spinner
+    container.innerHTML = `
+        <div class="loading">
+            <div class="spinner"></div>
+            Chargement des articles...
+        </div>
+    `;
+    
+    try {
+        // Charger depuis Firestore
+        db.collection('articles')
+            .where('published', '==', true)
+            .orderBy('createdAt', 'desc')
+            .get()
+            .then(snapshot => {
+                if (snapshot.empty) {
+                    container.innerHTML = `
+                        <div class="loading">
+                            <p>Aucun article publié pour le moment.</p>
+                            ${isAdmin ? '<button onclick="openModal(\'articleModal\')" class="btn-primary">Créer le premier article</button>' : ''}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let articlesHTML = '';
+                snapshot.forEach(doc => {
+                    const article = doc.data();
+                    const articleDate = article.createdAt ? article.createdAt.toDate().toLocaleDateString('fr-FR') : 'Date inconnue';
+                    
+                    articlesHTML += `
+                        <div class="article-card">
+                            <div class="article-header">
+                                <h2 class="article-title">${article.title}</h2>
+                                ${isAdmin ? `
+                                    <div class="article-actions">
+                                        <button onclick="editArticle('${doc.id}')" class="btn-secondary btn-small">Modifier</button>
+                                        <button onclick="deleteArticle('${doc.id}')" class="btn-danger btn-small">Supprimer</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="article-meta">
+                                <span>📅 ${articleDate}</span>
+                                <span>👤 ${article.author || 'Auteur inconnu'}</span>
+                            </div>
+                            <div class="article-content">${article.content}</div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = articlesHTML;
+                console.log('✅ Articles chargés avec succès');
+            })
+            .catch(error => {
+                console.error('❌ Erreur lors du chargement:', error);
+                container.innerHTML = `
+                    <div class="loading">
+                        <p>❌ Erreur lors du chargement des articles</p>
+                        <button onclick="loadArticles()" class="btn-primary">Réessayer</button>
+                    </div>
+                `;
+            });
+    } catch (error) {
+        console.error('❌ Erreur:', error);
+        container.innerHTML = '<div class="loading">❌ Erreur de connexion</div>';
+    } finally {
+        isLoadingArticles = false;
+    }
+}
 
     // Recharger les articles
     loadArticles();
@@ -145,14 +225,16 @@ async function handleArticleSubmit(e) {
     const title = document.getElementById('articleTitle').value.trim();
     const content = document.getElementById('articleContent').value.trim();
     const isPublished = document.getElementById('articlePublished').checked;
+    // Connecter le formulaire à la fonction
+document.getElementById('articleForm').addEventListener('submit', handleArticleSubmit);
 
     if (!title || !content) {
-        showMessage("Veuillez entrer un titre d'article et du contenu")
+        showMessage("Veuillez entrer un titre d'article et du contenu", "error");
         return;
     } 
 
     if (title.length < 5) {
-        showMessage("Veuillez entrer un minimum de 5 lettres pour votre titre")
+        showMessage("Veuillez entrer un minimum de 5 lettres pour votre titre", "error");
         return;
     }
 
@@ -175,7 +257,10 @@ async function handleArticleSubmit(e) {
         showMessage("Article créé avec succès", "success");
         closeModal('articleModal');
         document.getElementById("articleForm").reset();
+         // Optionnel : recharger la liste des articles
+        // loadArticles();
     } catch (error) {
+        console.error("Erreur:", error);
         showMessage("Erreur lors de la sauvegarde", "error");
     }
 
