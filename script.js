@@ -78,24 +78,45 @@ auth.onAuthStateChanged(async (user) => {
         isAdmin = false;
     }
 
-    async function loadArticles(params) {
-        
-    }
-
     // Recharger les articles
     loadArticles();
 });
+
+async function loadArticles(){
+    const container = document.getElementById('articles-container');
+    
+    try{
+        const snapshot = await db.collection('articles')
+        .orderBy('createdAt', 'desc')
+        .get();
+
+        container.innerHTML = "";
+        snapshot.forEach((doc) => {
+            const article = doc.data();
+            const content = document.createElement("div");
+   content.className("div");
+   div.className ="articles";
+   div.innerHTML = `<h2>${article.title}</h2>
+   <p>${article.content}</p>`
+
+   container.appendChild('div');
+   
+        });
+        if(snapshot.empty){
+            container.innerHTML = `<p> Aucun article trouvé </p>`
+        }
+    }catch(error){
+        console.error("Erreur des chargements", error);
+        container.innerHTML = `<p> Erreur lors du chargement </p>`;
+    }
+}
+ loadArticles();
 
 // ========================================
 // EVENT LISTENERS
 // ========================================
 
-function showMessage(id){
-    const showMessage = document.getElementById('showMessage')
-    if(showMessage){
 
-    }
-}
 
 function openModal(id){
     const modal = document.getElementById(id);
@@ -112,18 +133,9 @@ function closeModal(id){
         }
 }
 
-function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    modal.style.display = "block";
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    modal.style.display = "none";
-}
 
 function showMessage(message, type) {
-    const container = document.getElementById("messageContainer");
+    const container = document.getElementById("showMessage");
     if(!message) {
         return;
     }
@@ -139,48 +151,54 @@ function showMessage(message, type) {
     content.remove();
    }, 3000)
 }
+
+
+
+
 async function handleArticleSubmit(e) {
     e.preventDefault();
 
-    const title = document.getElementById('articleTitle').value.trim();
-    const content = document.getElementById('articleContent').value.trim();
-    const isPublished = document.getElementById('articlePublished').checked;
+    const form = e.target;
+    const titre = form.querySelector('input[name="titre"]').value.trim();
+    const contenu = form.querySelector('textarea[name="contenu"]').value.trim();
 
-    if (!title || !content) {
-        showMessage("Veuillez entrer un titre d'article et du contenu")
+    if (!titre || !contenu) {
+        showMessage("⚠️ Veuillez remplir tous les champs !", "error");
         return;
-    } 
-
-    if (title.length < 5) {
-        showMessage("Veuillez entrer un minimum de 5 lettres pour votre titre")
-        return;
-    }
-
-    if (!auth.currentUser) {
-        showMessage("Veuillez vous connecter", "error");
-        return;
-    }
-
-    const name = auth.currentUser.displayName || auth.currentUser.email || "Anonyme";
-    const articleData = {
-        title: title,
-        content: content,
-        userName: name,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        isPublished: isPublished,
     }
 
     try {
-        await db.collection('articles').add(articleData);
-        showMessage("Article créé avec succès", "success");
-        closeModal('articleModal');
-        document.getElementById("articleForm").reset();
+        const article = {
+            author: currentUser ? currentUser.email : "anonyme",
+            title: titre,
+            content: contenu,
+            published: true, // ou false si tu veux gérer des brouillons
+            createAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updateAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (currentEditingArticle) {
+            // 🔄 Mise à jour d’un article existant
+            await db.collection("articles").doc(currentEditingArticle).update(article);
+            showMessage("✅ Article mis à jour avec succès", "success");
+            currentEditingArticle = null;
+        } else {
+            // ➕ Création d’un nouvel article
+            await db.collection("articles").add(article);
+            showMessage("✅ Nouvel article ajouté", "success");
+        }
+
+        form.reset();
+        closeModal("articleModal");
+        loadArticles();
     } catch (error) {
-        showMessage("Erreur lors de la sauvegarde", "error");
+        console.error("❌ Erreur lors de la soumission de l'article :", error);
+        showMessage("Erreur lors de l’enregistrement de l’article", "error");
     }
-
+    // Fonction placeholder - implémentez selon vos besoins
+    console.log('📝 Soumission d\'article...');
+    // Votre logique de soumission d'article ici
 }
-
 
 
 
@@ -344,14 +362,6 @@ async function handleRegister(e) {
         showMessage(message, 'error');
     }
 }
-
-
-async function handleArticleSubmit(e){
-    const titre = document.getElementById("articleTitle").value;
-     const content = document.getElementById("articleContent").value;
-      const published = document.getElementById("articlePublished").checked;
-}
-
 
 
 
