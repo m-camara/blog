@@ -26,6 +26,54 @@ let isAdmin = false;             // Statut admin
 let isLoadingArticles = false;   // Flag de chargement
 
 
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+
+function showMessage(message, type) {
+    // Créer ou utiliser un élément pour afficher les messages
+    let messageElement = document.getElementById('messageContainer');
+    
+    if (!messageElement) {
+        messageElement = document.createElement('div');
+        messageElement.id = 'messageContainer';
+        messageElement.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            min-width: 300px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        `;
+        document.body.appendChild(messageElement);
+    }
+    
+    messageElement.textContent = message;
+    messageElement.className = type === 'success' ? 'message-success' : 'message-error';
+    messageElement.style.backgroundColor = type === 'success' ? '#4CAF50' : '#f44336';
+    messageElement.style.display = 'block';
+    
+    // Auto-hide après 5 secondes
+    setTimeout(() => {
+        messageElement.style.display = 'none';
+    }, 5000);
+}
+
 
 // ========================================
 // OBSERVER D'AUTHENTIFICATION
@@ -85,96 +133,109 @@ auth.onAuthStateChanged(async (user) => {
 // ========================================
 // EVENT LISTENERS
 // ========================================
+
+
+
+
+
+
+
+
+
+
+
 async function loadArticles() {
-    const container = document.getElementById('articlesContainer');
-    
-    try {
-        // Afficher un indicateur de chargement
-        container.innerHTML = '<p>Chargement des articles...</p>';
-        
-        // 1. Récupérer les articles depuis Firestore
-        const snapshot = await db.collection('articles')
-            .orderBy('createdAt', 'desc')
-            .get();
-
-        // 2. Vider le conteneur
-        container.innerHTML = '';
-
-        // 3. Vérifier s'il y a des articles
-        if (snapshot.empty) {
-            container.innerHTML = '<p>Aucun article à afficher.</p>';
-            return;
-        }
-
-        // 4. Créer et ajouter chaque article
-        snapshot.forEach((doc) => {
-            const article = doc.data();
-            const articleElement = document.createElement('div');
-            articleElement.className = 'article';
-            articleElement.innerHTML = `
-                <h3>${article.title}</h3>
-                <p>${article.content}</p>
-                <div class="article-meta">
-                    <span>Par ${article.author}</span>
-                    <span>•</span>
-                    <span>${article.createdAt ? new Date(article.createdAt.toDate()).toLocaleDateString() : 'Date inconnue'}</span>
-                </div>
-            `;
-            container.appendChild(articleElement);
-        });
-
-    } catch (error) {
-        console.error('Erreur lors du chargement des articles:', error);
-        container.innerHTML = '<p class="error">Erreur lors du chargement des articles</p>';
-    }
-}
-
-
-function openModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.classList.add('active');
-        
+    if(isLoadingArticles) return;{
+        isLoadingArticles = true;
 
     }
-}
+    console.log('📰 Chargement des articles...');
+    const container = document.getElementById('articlesContainer'); // Bon ID
+    container.innerHTML = "";
 
-function closeModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.remove("active");
-    }
-}
-
-
-function showMessage(message, type) {
-    const container = document.getElementById("showMessage");
-    if (!message) {
+    if (!container) {
+        console.error('Container articles non trouvé');
         return;
     }
-    const content = document.createElement("div");
-    content.textContent = message;
-    container.appendChild(content);
-    if (type === "success") {
-        content.className = "message-success";
-    } else if (type === "error") {
-        content.className = "message-error";
+    
+    // Afficher le spinner
+    container.innerHTML = `
+        <div class="loading">
+            <div class="spinner"></div>
+            Chargement des articles...
+        </div>
+    `;
+    
+    try {
+        // Charger depuis Firestore
+        db.collection('articles')
+            .where('published', '==', true)
+            .orderBy('createdAt', 'desc')
+            .get()
+            .then(snapshot => {
+                if (snapshot.empty) {
+                    container.innerHTML = `
+                        <div class="loading">
+                            <p>Aucun article publié pour le moment.</p>
+                            ${isAdmin ? '<button onclick="openModal(\'articleModal\')" class="btn-primary">Créer le premier article</button>' : ''}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let articlesHTML = '';
+                snapshot.forEach(doc => {
+                    const article = doc.data();
+                    const articleDate = article.createdAt ? article.createdAt.toDate().toLocaleDateString('fr-FR') : 'Date inconnue';
+                    
+                    articlesHTML += `
+                        <div class="article-card">
+                            <div class="article-header">
+                                <h2 class="article-title">${article.title}</h2>
+                                ${isAdmin ? `
+                                    <div class="article-actions">
+                                        <button onclick="editArticle('${doc.id}')" class="btn-secondary btn-small">Modifier</button>
+                                        <button onclick="deleteArticle('${doc.id}')" class="btn-danger btn-small">Supprimer</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="article-meta">
+                                <span>📅 ${articleDate}</span>
+                                <span>👤 ${article.author || 'Auteur inconnu'}</span>
+                            </div>
+                            <div class="article-content">${article.content}</div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = articlesHTML;
+                console.log('✅ Articles chargés avec succès');
+            })
+            .catch(error => {
+                console.error('❌ Erreur lors du chargement:', error);
+                container.innerHTML = `
+                    <div class="loading">
+                        <p>❌ Erreur lors du chargement des articles</p>
+                        <button onclick="loadArticles()" class="btn-primary">Réessayer</button>
+                    </div>
+                `;
+            });
+    } catch (error) {
+        console.error('❌ Erreur:', error);
+        container.innerHTML = '<div class="loading">❌ Erreur de connexion</div>';
+    } finally {
+        isLoadingArticles = false;
     }
-    setTimeout(() => {
-        content.remove();
-    }, 3000)
 }
-
 
 
 
 async function handleArticleSubmit(e) {
     e.preventDefault();
 
-    const form = e.target;
-    const titre = form.querySelector('input[name="titre"]').value.trim();
-    const contenu = form.querySelector('textarea[name="contenu"]').value.trim();
+    const published = document.getElementById('articlePublished').checked;
+    const titre = document.getElementById('articleTitle').value.trim();
+    const contenu = document.getElementById('articleContent').value.trim();
 
     if (!titre || !contenu) {
         showMessage("⚠️ Veuillez remplir tous les champs !", "error");
@@ -188,7 +249,9 @@ async function handleArticleSubmit(e) {
             content: contenu,
             published: true, // ou false si tu veux gérer des brouillons
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+
+
         };
 
         if (currentEditingArticle) {
@@ -202,18 +265,60 @@ async function handleArticleSubmit(e) {
             showMessage("✅ Nouvel article ajouté", "success");
         }
 
-        form.reset();
+        
         closeModal("articleModal");
         loadArticles();
     } catch (error) {
         console.error("❌ Erreur lors de la soumission de l'article :", error);
         showMessage("Erreur lors de l’enregistrement de l’article", "error");
     }
-    // Fonction placeholder - implémentez selon vos besoins
-    console.log('📝 Soumission d\'article...');
-    // Votre logique de soumission d'article ici
 }
 
+
+
+async function searchArticles(searchTerm) {
+    try{
+        const snapshot = await db.collection('articles')
+        .where('published', '==',true)
+        .get();
+
+        const result = [];
+        snapshot.forEach(doc =>{
+            const article = doc.data();
+            if(article.title.toLowerCase().includes(searchTerm.toLowerCase()) || article.content.toLowerCase().includes(searchTerm.toLowerCase())){
+                result.push({id : doc.id, data: article});
+            }
+        });
+
+        displaySearchResults(results);
+
+    }catch(error){
+        console.error('Erreur lors de la recherche:', error);
+        showMessage('Erreur lors de la recherche', error);
+    }
+}
+
+function createArticleElement(id,article){
+    const articleDiv = document.createElement('div');
+    articleDiv.className = 'article-card';
+    articleDiv.innerHTML = `<div class="article-header">
+            <h3>${escapeHtml(article.title)}</h3>
+            <div class="article-meta">
+                <span>Par ${escapeHtml(article.author)}</span>
+                <span>${formatDate(article.createdAt)}</span>
+            </div>
+        </div>
+        <div class="article-content">
+            <p>${escapeHtml(article.content).substring(0, 200)}${article.content.length > 200 ? '...' : ''}</p>
+        </div>
+        ${isAdmin ? `
+            <div class="article-actions">
+                <button onclick="editArticle('${id}')" class="btn-edit">✏️ Modifier</button>
+                <button onclick="deleteArticle('${id}')" class="btn-delete">🗑️ Supprimer</button>
+            </div>`: ''}
+            `;
+            return articleDiv;
+};
 
 
 
