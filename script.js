@@ -112,6 +112,80 @@ function closeModal(id){
         }
 }
 
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.style.display = "block";
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.style.display = "none";
+}
+
+function showMessage(message, type) {
+    const container = document.getElementById("messageContainer");
+    if(!message) {
+        return;
+    }
+   const content = document.createElement("div");
+   content.textContent = message;
+   container.appendChild(content);
+   if (type === "success") {
+    content.className = "message-success";
+   } else if (type === "error") {
+    content.className = "message-error";
+   }
+   setTimeout(() => {
+    content.remove();
+   }, 3000)
+}
+async function handleArticleSubmit(e) {
+    e.preventDefault();
+
+    const title = document.getElementById('articleTitle').value.trim();
+    const content = document.getElementById('articleContent').value.trim();
+    const isPublished = document.getElementById('articlePublished').checked;
+
+    if (!title || !content) {
+        showMessage("Veuillez entrer un titre d'article et du contenu")
+        return;
+    } 
+
+    if (title.length < 5) {
+        showMessage("Veuillez entrer un minimum de 5 lettres pour votre titre")
+        return;
+    }
+
+    if (!auth.currentUser) {
+        showMessage("Veuillez vous connecter", "error");
+        return;
+    }
+
+    const name = auth.currentUser.displayName || auth.currentUser.email || "Anonyme";
+    const articleData = {
+        title: title,
+        content: content,
+        userName: name,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        isPublished: isPublished,
+    }
+
+    try {
+        await db.collection('articles').add(articleData);
+        showMessage("Article créé avec succès", "success");
+        closeModal('articleModal');
+        document.getElementById("articleForm").reset();
+    } catch (error) {
+        showMessage("Erreur lors de la sauvegarde", "error");
+    }
+
+}
+
+
+
+
+
+
 document.addEventListener("DOMContentLoaded",()=>{
     const registerBtn = document.getElementById("registerBtn");
     if(registerBtn){
