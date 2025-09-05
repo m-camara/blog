@@ -82,74 +82,88 @@ auth.onAuthStateChanged(async (user) => {
     loadArticles();
 });
 
-async function loadArticles(){
-    const container = document.getElementById('articles-container');
-    
-    try{
-        const snapshot = await db.collection('articles')
-        .orderBy('createdAt', 'desc')
-        .get();
-
-        container.innerHTML = "";
-        snapshot.forEach((doc) => {
-            const article = doc.data();
-            const content = document.createElement("div");
-   content.className("div");
-   div.className ="articles";
-   div.innerHTML = `<h2>${article.title}</h2>
-   <p>${article.content}</p>`
-
-   container.appendChild('div');
-   
-        });
-        if(snapshot.empty){
-            container.innerHTML = `<p> Aucun article trouvé </p>`
-        }
-    }catch(error){
-        console.error("Erreur des chargements", error);
-        container.innerHTML = `<p> Erreur lors du chargement </p>`;
-    }
-}
- loadArticles();
-
 // ========================================
 // EVENT LISTENERS
 // ========================================
+async function loadArticles() {
+    const container = document.getElementById('articlesContainer');
+    
+    try {
+        // Afficher un indicateur de chargement
+        container.innerHTML = '<p>Chargement des articles...</p>';
+        
+        // 1. Récupérer les articles depuis Firestore
+        const snapshot = await db.collection('articles')
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        // 2. Vider le conteneur
+        container.innerHTML = '';
+
+        // 3. Vérifier s'il y a des articles
+        if (snapshot.empty) {
+            container.innerHTML = '<p>Aucun article à afficher.</p>';
+            return;
+        }
+
+        // 4. Créer et ajouter chaque article
+        snapshot.forEach((doc) => {
+            const article = doc.data();
+            const articleElement = document.createElement('div');
+            articleElement.className = 'article';
+            articleElement.innerHTML = `
+                <h3>${article.title}</h3>
+                <p>${article.content}</p>
+                <div class="article-meta">
+                    <span>Par ${article.author}</span>
+                    <span>•</span>
+                    <span>${article.createdAt ? new Date(article.createdAt.toDate()).toLocaleDateString() : 'Date inconnue'}</span>
+                </div>
+            `;
+            container.appendChild(articleElement);
+        });
+
+    } catch (error) {
+        console.error('Erreur lors du chargement des articles:', error);
+        container.innerHTML = '<p class="error">Erreur lors du chargement des articles</p>';
+    }
+}
 
 
-
-function openModal(id){
+function openModal(id) {
     const modal = document.getElementById(id);
-    if(modal){
-          modal.classList.add('active');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+        
 
     }
 }
 
-function closeModal(id){
+function closeModal(id) {
     const modal = document.getElementById(id);
-        if(modal){
-            modal.classList.remove("active");
-        }
+    if (modal) {
+        modal.classList.remove("active");
+    }
 }
 
 
 function showMessage(message, type) {
     const container = document.getElementById("showMessage");
-    if(!message) {
+    if (!message) {
         return;
     }
-   const content = document.createElement("div");
-   content.textContent = message;
-   container.appendChild(content);
-   if (type === "success") {
-    content.className = "message-success";
-   } else if (type === "error") {
-    content.className = "message-error";
-   }
-   setTimeout(() => {
-    content.remove();
-   }, 3000)
+    const content = document.createElement("div");
+    content.textContent = message;
+    container.appendChild(content);
+    if (type === "success") {
+        content.className = "message-success";
+    } else if (type === "error") {
+        content.className = "message-error";
+    }
+    setTimeout(() => {
+        content.remove();
+    }, 3000)
 }
 
 
@@ -173,8 +187,8 @@ async function handleArticleSubmit(e) {
             title: titre,
             content: contenu,
             published: true, // ou false si tu veux gérer des brouillons
-            createAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updateAt: firebase.firestore.FieldValue.serverTimestamp()
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         if (currentEditingArticle) {
@@ -204,12 +218,12 @@ async function handleArticleSubmit(e) {
 
 
 
-document.addEventListener("DOMContentLoaded",()=>{
+document.addEventListener("DOMContentLoaded", () => {
     const registerBtn = document.getElementById("registerBtn");
-    if(registerBtn){
-        registerBtn.addEventListener("click",() => openModal("registerModal"));
+    if (registerBtn) {
+        registerBtn.addEventListener("click", () => openModal("registerModal"));
 
-    }else{
+    } else {
         console.log('bouton introuvable')
     }
 })
@@ -245,32 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ========================================
 // EVENT LISTENERS
 // ========================================
-document.addEventListener('DOMContentLoaded', () => {
-    // Boutons d'authentification
-    document.getElementById('loginBtn').addEventListener('click',
-        () => openModal('loginModal'));
-
-    document.getElementById('registerBtn').addEventListener('click',
-        () => openModal('registerModal'));
-
-    document.getElementById('logoutBtn').addEventListener('click', logout);
-
-    // Bouton nouvel article (admin)
-    const newArticleBtn = document.getElementById('newArticleBtn');
-    if (newArticleBtn) {
-        newArticleBtn.addEventListener('click', () => {
-            currentEditingArticle = null;
-            document.getElementById('articleModalTitle').textContent = 'Nouvel Article';
-            document.getElementById('articleForm').reset();
-            openModal('articleModal');
-        });
-    }
-
-    // Formulaires
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('registerForm').addEventListener('submit', handleRegister);
-    document.getElementById('articleForm').addEventListener('submit', handleArticleSubmit);
-});
 
 // ========================================
 // CONNEXION
