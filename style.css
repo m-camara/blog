@@ -10,7 +10,11 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-image: url(https://i.postimg.cc/bNs1NTpV/photo-1506104489822-562ca25152fe.jpg);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
     min-height: 100vh;
 }
 
@@ -24,7 +28,7 @@ body {
    HEADER
    ===================== */
 header {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.368);
     backdrop-filter: blur(10px);
     padding: 20px;
     border-radius: 10px;
@@ -119,12 +123,31 @@ button {
 }
 
 .modal-content {
-    background: white;
+    background: rgb(255, 255, 255);
     padding: 30px;
     border-radius: 10px;
     width: 90%;
     max-width: 500px;
     animation: slideIn 0.3s ease;
+
+}
+
+
+.articles-container{
+    background-color: white;
+    padding: 4%;
+    border-radius: 30px;
+    transition: all 0.3s ease;
+
+}
+
+.articles-container:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgb(0, 0, 0);
+}
+
+.article-card{
+    margin: 4%;
 }
 
 /* =====================

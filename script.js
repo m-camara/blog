@@ -44,7 +44,7 @@ function closeModal(modalId) {
 function showMessage(message, type) {
     // Créer ou utiliser un élément pour afficher les messages
     let messageElement = document.getElementById('messageContainer');
-    
+
     if (!messageElement) {
         messageElement = document.createElement('div');
         messageElement.id = 'messageContainer';
@@ -62,12 +62,12 @@ function showMessage(message, type) {
         `;
         document.body.appendChild(messageElement);
     }
-    
+
     messageElement.textContent = message;
     messageElement.className = type === 'success' ? 'message-success' : 'message-error';
     messageElement.style.backgroundColor = type === 'success' ? '#4CAF50' : '#f44336';
     messageElement.style.display = 'block';
-    
+
     // Auto-hide après 5 secondes
     setTimeout(() => {
         messageElement.style.display = 'none';
@@ -82,7 +82,7 @@ auth.onAuthStateChanged(async (user) => {
     currentUser = user;
 
     if (user) {
-        console.log('✅ Utilisateur connecté:', user.email);
+        console.log('✅ Utilisateur connecté:', user.displayName);
 
         // Récupérer les informations utilisateur
         try {
@@ -137,27 +137,32 @@ auth.onAuthStateChanged(async (user) => {
 
 
 
-
-
-
-
-
-
-
 async function loadArticles() {
-    if(isLoadingArticles) return;{
+
+    console.log('🔍 Début de loadArticles');
+    console.log('isAdmin:', isAdmin);
+    console.log('container:', document.getElementById('articlesContainer'));
+    const snapshot = await db.collection('articles');
+
+    // Dans le .then() après .get()
+    console.log('📊 Nombre d\'articles:', snapshot.size);
+
+
+    if (isLoadingArticles) return; {
         isLoadingArticles = true;
 
     }
+
     console.log('📰 Chargement des articles...');
     const container = document.getElementById('articlesContainer'); // Bon ID
     container.innerHTML = "";
 
     if (!container) {
         console.error('Container articles non trouvé');
+        isLoadingArticles = false;
         return;
     }
-    
+
     // Afficher le spinner
     container.innerHTML = `
         <div class="loading">
@@ -165,7 +170,7 @@ async function loadArticles() {
             Chargement des articles...
         </div>
     `;
-    
+
     try {
         // Charger depuis Firestore
         db.collection('articles')
@@ -182,12 +187,12 @@ async function loadArticles() {
                     `;
                     return;
                 }
-                
+
                 let articlesHTML = '';
                 snapshot.forEach(doc => {
                     const article = doc.data();
                     const articleDate = article.createdAt ? article.createdAt.toDate().toLocaleDateString('fr-FR') : 'Date inconnue';
-                    
+
                     articlesHTML += `
                         <div class="article-card">
                             <div class="article-header">
@@ -204,10 +209,22 @@ async function loadArticles() {
                                 <span>👤 ${article.author || 'Auteur inconnu'}</span>
                             </div>
                             <div class="article-content">${article.content}</div>
+
+                            <div class ="comments-section id = "comments-section-${doc.id}">
+                            <h4>💬 Commentaires</h4>
+            <div id="comments-list-${doc.id}">Chargement...</div>
+            
+            ${currentUser ? `
+            <form onsubmit="addComment(event, '${doc.id}')">
+                <input type="text" id="comment-input-${doc.id}" placeholder="Écrire un commentaire..." required>
+                <button type="submit" class="btn-primary">Envoyer</button>
+            </form>
+            ` : `<p><em>Connectez-vous pour commenter</em></p>`}
+        </div>
                         </div>
                     `;
                 });
-                
+
                 container.innerHTML = articlesHTML;
                 console.log('✅ Articles chargés avec succès');
             })
@@ -265,7 +282,7 @@ async function handleArticleSubmit(e) {
             showMessage("✅ Nouvel article ajouté", "success");
         }
 
-        
+
         closeModal("articleModal");
         loadArticles();
     } catch (error) {
@@ -277,28 +294,80 @@ async function handleArticleSubmit(e) {
 
 
 async function searchArticles(searchTerm) {
-    try{
+    try {
         const snapshot = await db.collection('articles')
-        .where('published', '==',true)
-        .get();
+            .where('published', '==', true)
+            .get();
 
         const result = [];
-        snapshot.forEach(doc =>{
+        snapshot.forEach(doc => {
             const article = doc.data();
-            if(article.title.toLowerCase().includes(searchTerm.toLowerCase()) || article.content.toLowerCase().includes(searchTerm.toLowerCase())){
-                result.push({id : doc.id, data: article});
+            if (article.title.toLowerCase().includes(searchTerm.toLowerCase()) || article.content.toLowerCase().includes(searchTerm.toLowerCase())) {
+                result.push({ id: doc.id, data: article });
             }
         });
 
         displaySearchResults(results);
 
-    }catch(error){
+    } catch (error) {
         console.error('Erreur lors de la recherche:', error);
         showMessage('Erreur lors de la recherche', error);
     }
 }
 
-function createArticleElement(id,article){
+
+async function deleteArticle(articleId) {
+    if (!isAdmin) {
+        showMessage('Action non autorisée', error);
+        return;
+    }
+
+    if (confirm('Êtes-vous sur de vouloir supprimer cet article?')) {
+        try {
+            await db.collection('articles').doc(articleId).delete();
+            showMessage('Article supprimé avec succès', 'success');
+            loadArticles();
+
+        } catch (error) {
+            console.error('Erreur lors de la suppression', error);
+            showMessage('Erreur lors de la suppression de l\'article', 'error');
+        }
+    }
+}
+
+async function editArticle(articleId) {
+    if (!isAdmin) {
+        showMessage('Action non autorisée', 'error');
+        return;
+    }
+    
+    try {
+        const doc = await db.collection('articles').doc(articleId).get();
+        
+        if (doc.exists) {
+            const article = doc.data();
+            
+            // Remplir le formulaire
+            document.getElementById('articleTitle').value = article.title || '';
+            document.getElementById('articleContent').value = article.content || '';
+            document.getElementById('articlePublished').checked = article.published !== false;
+            
+            // Stocker l'ID pour la modification
+            currentEditingArticle = articleId;
+            
+            // Ouvrir le modal
+            document.getElementById('articleModalTitle').textContent = 'Modifier l\'article';
+            openModal('articleModal');
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement:', error);
+        showMessage('Erreur lors du chargement de l\'article', 'error');
+    }
+}
+
+
+
+function createArticleElement(id, article) {
     const articleDiv = document.createElement('div');
     articleDiv.className = 'article-card';
     articleDiv.innerHTML = `<div class="article-header">
@@ -311,14 +380,83 @@ function createArticleElement(id,article){
         <div class="article-content">
             <p>${escapeHtml(article.content).substring(0, 200)}${article.content.length > 200 ? '...' : ''}</p>
         </div>
-        ${isAdmin ? `
+        ${currentUser ? `
             <div class="article-actions">
                 <button onclick="editArticle('${id}')" class="btn-edit">✏️ Modifier</button>
                 <button onclick="deleteArticle('${id}')" class="btn-delete">🗑️ Supprimer</button>
             </div>`: ''}
             `;
-            return articleDiv;
+    return articleDiv;
 };
+
+
+async function getArticleComments(articleId) {
+    try {
+        const snapshot = await db.collection('articles')
+            .doc(articleId)
+            .collection('comments')
+            .orderBy('createdAt', 'asc')
+            .get();
+
+        const comments = [];
+        snapshot.forEach(doc => {
+            comments.push({ id: doc.id, ...doc.data() });
+        });
+        return comments;
+    } catch (error) {
+        console.error('Erreur getArticleComments:', error);
+        return [];
+    }
+}
+
+
+
+function buildCommentsHTML(comments){
+    if(!comments || comments.length === 0){
+        return `<p> class = "no-comments"> Aucun commentaire pour le moment. </p>`
+    }
+    return comments.map(c=>`<div class = "comment">
+        <p><strong>${c.author || "Anonyme"}</strong> (${c.createdAt?.toDate().toLocaleDateString("fr-FR") || "?"})</p>
+        <p>${c.content}</p>
+        </div>
+        `).join("");
+}
+
+async function addComment(e, articleId) {
+    e.preventDefault();
+    if (!currentUser) {
+        showMessage("Vous devez être connecté pour commenter", "error");
+        return;
+    }
+
+    const input = document.getElementById(`comment-input-${articleId}`);
+    const content = input.value.trim();
+    if (!content) {
+        showMessage("Veuillez écrire un commentaire", "error");
+        return;
+    }
+
+    try {
+        await db.collection('articles')
+            .doc(articleId)
+            .collection('comments')
+            .add({
+                author: currentUser.displayName || currentUser.email,
+                content: content,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+        input.value = "";
+        showMessage("✅ Commentaire ajouté", "success");
+
+        // Recharger la liste des commentaires
+        const comments = await getArticleComments(articleId);
+        document.getElementById(`comments-list-${articleId}`).innerHTML = buildCommentsHTML(comments);
+    } catch (error) {
+        console.error("Erreur addComment:", error);
+        showMessage("Erreur ajout commentaire", "error");
+    }
+}
 
 
 
