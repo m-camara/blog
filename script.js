@@ -189,43 +189,47 @@ async function loadArticles() {
                 }
 
                 let articlesHTML = '';
+                const loadCommentsPromises = [];
                 snapshot.forEach(doc => {
                     const article = doc.data();
                     const articleDate = article.createdAt ? article.createdAt.toDate().toLocaleDateString('fr-FR') : 'Date inconnue';
+
 
                     articlesHTML += `
                         <div class="article-card">
                             <div class="article-header">
                                 <h2 class="article-title">${article.title}</h2>
+                                 <span>👤 ${article.user}</span>
+                                 <div class="article-meta">
+                                <span>📅 ${articleDate}</span>
+                            </div>
                                 ${isAdmin ? `
-                                    <div class="article-actions">
+                                ` : ''}
+                            </div>
+                            <div class="article-content">${article.content}</div>
+                            <div class="article-actions">
                                         <button onclick="editArticle('${doc.id}')" class="btn-secondary btn-small">Modifier</button>
                                         <button onclick="deleteArticle('${doc.id}')" class="btn-danger btn-small">Supprimer</button>
                                     </div>
-                                ` : ''}
-                            </div>
-                            <div class="article-meta">
-                                <span>📅 ${articleDate}</span>
-                                <span>👤 ${article.author || 'Auteur inconnu'}</span>
-                            </div>
-                            <div class="article-content">${article.content}</div>
 
-                            <div class ="comments-section id = "comments-section-${doc.id}">
+                           <div class="comments-section" id="comments-section-${doc.id}">
                             <h4>💬 Commentaires</h4>
-            <div id="comments-list-${doc.id}">Chargement...</div>
-            
+            <div id="comments-list-${doc.id}"></div>
             ${currentUser ? `
-            <form onsubmit="addComment(event, '${doc.id}')">
-                <input type="text" id="comment-input-${doc.id}" placeholder="Écrire un commentaire..." required>
-                <button type="submit" class="btn-primary" onclick="addComment">Envoyer</button>
-            </form>
-            ` : `<p><em>Connectez-vous pour commenter</em></p>`}
+<form onsubmit="addComment(event, '${doc.id}')">
+    <input type="text" id="comment-input-${doc.id}" placeholder="Écrire un commentaire..." required>
+    <button type="submit" class="btn-primary">Envoyer</button>
+</form>
+` : `<p><em>Connectez-vous pour commenter</em></p>`}
         </div>
                         </div>
                     `;
+                    loadCommentsPromises.push(loadComments(doc.id));
                 });
-
                 container.innerHTML = articlesHTML;
+
+                Promise.all(loadCommentsPromises);
+
                 console.log('✅ Articles chargés avec succès');
             })
             .catch(error => {
@@ -236,19 +240,77 @@ async function loadArticles() {
                         <button onclick="loadArticles()" class="btn-primary">Réessayer</button>
                     </div>
                 `;
+
             });
+
+
     } catch (error) {
         console.error('❌ Erreur:', error);
         container.innerHTML = '<div class="loading">❌ Erreur de connexion</div>';
     } finally {
         isLoadingArticles = false;
     }
-    snapshot.forEach(doc=>{
-        loadComments(doc.id);
-    })
+    
 }
 
+async function buildArticleHTML(articleId, article) {
+    const articleDate = article.createdAt ? article.createdAt.toDate().toLocaleDateString('fr-FR') : 'Date inconnue';
 
+    // Récupérer les statistiques de l'article
+    const stats = await getArticleStats(articleId);
+    const userReaction = userReactions[articleId] || null;
+
+    // Récupérer les commentaires
+    const comments = await getArticleComments(articleId);
+
+    return `
+        <div class="article-card" data-article-id="${articleId}">
+            <div class="article-header">
+                <h2 class="article-title">${article.title}</h2>
+                ${isAdmin ? `
+                    <div class="article-actions">
+                        <button onclick="editArticle('${articleId}')" class="btn-secondary btn-small">Modifier</button>
+                        <button onclick="deleteArticle('${articleId}')" class="btn-danger btn-small">Supprimer</button>
+                    </div>
+                ` : ''}
+            </div>
+            <div class="article-meta">
+                <span>📅 ${articleDate}</span>
+                <span>👤 ${article.author || 'Auteur inconnu'}</span>
+            </div>
+            <div class="article-content">${article.content}</div>
+            
+            <!-- Système de réactions -->
+            <div class="reactions">
+                <button onclick="toggleReaction('${articleId}', 'like')" 
+                        class="reaction-btn ${userReaction === 'like' ? 'active like' : ''}">
+                    👍 <span id="likes-${articleId}">${stats.likes}</span>
+                </button>
+                <button onclick="toggleReaction('${articleId}', 'dislike')" 
+                        class="reaction-btn ${userReaction === 'dislike' ? 'active dislike' : ''}">
+                    👎 <span id="dislikes-${articleId}">${stats.dislikes}</span>
+                </button>
+                <button onclick="toggleComments('${articleId}')" class="reaction-btn">
+                    💬 ${comments.length} commentaire(s)
+                </button>
+            </div>
+            
+            <!-- Section des commentaires -->
+            <div id="comments-section-${articleId}" class="comments-section" style="display: none;">
+                ${currentUser ? `
+                    <form onsubmit="addComment(event, '${articleId}')" class="comment-form">
+                        <textarea id="comment-input-${articleId}" placeholder="Écrivez votre commentaire..." required></textarea>
+                        <button type="submit" class="btn-primary btn-small">Commenter</button>
+                    </form>
+                ` : '<p class="login-prompt">Connectez-vous pour commenter</p>'}
+                
+                <div id="comments-list-${articleId}" class="comments-list">
+                    ${buildCommentsHTML(comments)}
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 async function handleArticleSubmit(e) {
     e.preventDefault();
@@ -343,21 +405,21 @@ async function editArticle(articleId) {
         showMessage('Action non autorisée', 'error');
         return;
     }
-    
+
     try {
         const doc = await db.collection('articles').doc(articleId).get();
-        
+
         if (doc.exists) {
             const article = doc.data();
-            
+
             // Remplir le formulaire
             document.getElementById('articleTitle').value = article.title || '';
             document.getElementById('articleContent').value = article.content || '';
             document.getElementById('articlePublished').checked = article.published !== false;
-            
+
             // Stocker l'ID pour la modification
             currentEditingArticle = articleId;
-            
+
             // Ouvrir le modal
             document.getElementById('articleModalTitle').textContent = 'Modifier l\'article';
             openModal('articleModal');
@@ -392,10 +454,10 @@ function createArticleElement(id, article) {
     return articleDiv;
 };
 
-async function loadComments(articleId){
-    try{
-        const commentsContainer =  document.getElementById(`comments-list-${articleId}`);
-        if(!commentsContainer){
+async function loadComments(articleId) {
+    try {
+        const commentsContainer = document.getElementById(`comments-list-${articleId}`);
+        if (!commentsContainer) {
             console.error('Commentaire non trouvé pour article:', articleId);
             return;
         }
@@ -405,10 +467,10 @@ async function loadComments(articleId){
         const comments = await getArticleComments(articleId);
 
         commentsContainer.innerHTML = buildCommentsHTML(comments);
-    }catch(error){
+    } catch (error) {
         console.error('Erreur comment:', error);
         const commentsContainer = document.getElementById(`comments-list-${articleId}`);
-        if(commentsContainer){
+        if (commentsContainer) {
             commentsContainer.innerHTML = commentsContainer;
         }
     }
@@ -422,16 +484,25 @@ async function loadComments(articleId){
 
 async function getArticleComments(articleId) {
     try {
-        const snapshot = await db.collection('comments')
-            .doc(articleId)
-            .collection('comments')
-            .orderBy('createdAt', 'asc')
-            .get();
+        console.log("Récupération des commentaires pour l'article :", articleId);
+
+        const docRef = db.collection('comments').doc(articleId);
+        const subColRef = docRef.collection('comments');
+
+        const snapshot = await subColRef.get();
+
+        console.log("Nombre de documents trouvés :", snapshot.size);
 
         const comments = [];
         snapshot.forEach(doc => {
+            console.log("Doc trouvé :", doc.id, doc.data());
             comments.push({ id: doc.id, ...doc.data() });
         });
+
+        if (comments.length === 0) {
+            console.warn("Aucun commentaire trouvé. Vérifie la structure Firestore et le champ 'createdAt'.");
+        }
+
         return comments;
     } catch (error) {
         console.error('Erreur getArticleComments:', error);
@@ -443,11 +514,12 @@ async function getArticleComments(articleId) {
 
 
 
-function buildCommentsHTML(comments){
-    if(!comments || comments.length === 0){
+
+function buildCommentsHTML(comments) {
+    if (!comments || comments.length === 0) {
         return `${comments}`
     }
-    return comments.map(c=>`<div class = "comment">
+    return comments.map(c => `<div class = "comment">
         <p><strong>${c.author || "Anonyme"}</strong> (${c.createdAt?.toDate().toLocaleDateString("fr-FR") || "?"})</p>
         <p>${c.content}</p>
         </div>
@@ -469,19 +541,24 @@ async function addComment(e, articleId) {
     }
 
     try {
-        await db.collection('comments').add({
-            articleId: articleId, // ← Référence à l'article
-            author: currentUser.displayName || currentUser.email,
-            content: content,
-            userId: currentUser.uid,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        if (currentUser) {
+            await db.collection('comments')
+                .doc(articleId)
+                .collection('comments')
+                .add({
+                    articleId: articleId, // ← Référence à l'article
+                    author: currentUser.displayName || currentUser.email,
+                    content: content,
+                    userId: currentUser.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                })
+        };
 
         input.value = "";
         showMessage("✅ Commentaire ajouté", "success");
         // Recharger la liste des commentaires
         await loadComments(articleId);
-    
+
     } catch (error) {
         console.error("Erreur addComment:", error);
         showMessage("Erreur ajout commentaire", "error");
